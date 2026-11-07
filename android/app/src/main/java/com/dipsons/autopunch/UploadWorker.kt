@@ -16,6 +16,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import android.annotation.SuppressLint
+import android.location.Location
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.android.gms.tasks.Tasks
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -29,16 +35,27 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
     override fun doWork(): Result {
         if (!Prefs.linked(ctx)) return Result.failure()
         val d = inputData
+        var lat = d.getDouble("lat", 0.0); var lng = d.getDouble("lng", 0.0); var acc = d.getFloat("acc", -1f); var mock = d.getBoolean("mock", false)
+        val evTime = d.getLong("time", System.currentTimeMillis())
+        // The location Android attaches to a geofence event is often old / coarse (that is why a "left" punch was refused as "still inside").
+        // So take a NEW high-accuracy fix now; if that fails the server falls back to trusting the geofence event itself.
+        var fresh = false
+        val fix = freshFix()
+        if (fix != null && System.currentTimeMillis() - evTime < 5 * 60 * 1000) {
+            lat = fix.latitude; lng = fix.longitude; acc = fix.accuracy; fresh = true
+            mock = mock || isMock(fix)
+        }
         val body = JSONObject()
             .put("token", Prefs.token(ctx))
             .put("uid", d.getString("uid"))
             .put("event", d.getString("event"))
-            .put("lat", d.getDouble("lat", 0.0))
-            .put("lng", d.getDouble("lng", 0.0))
-            .put("accuracy", d.getFloat("acc", -1f).toDouble())
-            .put("mock", d.getBoolean("mock", false))
+            .put("lat", lat)
+            .put("lng", lng)
+            .put("accuracy", acc.toDouble())
+            .put("mock", mock)
+            .put("fresh", fresh)
             .put("loc_id", d.getInt("loc", 0))
-            .put("client_time", d.getLong("time", System.currentTimeMillis()))
+            .put("client_time", evTime)
         val r = try { Api.post("autopunch_event.php", body) } catch (e: Exception) { return Result.retry() }
         if (r.code == 401) { Prefs.clear(ctx); Geo.register(ctx); Prefs.saveLast(ctx, "This phone was unlinked. Open the app and link it again."); return Result.failure() }
         if (r.code >= 500 || r.json == null) return Result.retry()
@@ -48,6 +65,19 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
         Prefs.saveLast(ctx, "$stamp\n$msg")
         if (result == "punched_in" || result == "punched_out") notify(msg)
         return Result.success()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isMock(l: Location): Boolean = if (Build.VERSION.SDK_INT >= 31) l.isMock else l.isFromMockProvider
+
+    @SuppressLint("MissingPermission")
+    private fun freshFix(): Location? {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return null
+        return try {
+            val client = LocationServices.getFusedLocationProviderClient(ctx)
+            val cts = CancellationTokenSource()
+            Tasks.await(client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token), 25, TimeUnit.SECONDS)
+        } catch (e: Exception) { null }
     }
 
     private fun notify(text: String) {
