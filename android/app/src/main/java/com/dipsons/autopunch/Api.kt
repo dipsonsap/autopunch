@@ -20,7 +20,7 @@ object Api {
             conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            al text = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                       val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
             val json = try { JSONObject(text) } catch (e: Exception) { null }
             return Reply(code, json)
         } finally {
