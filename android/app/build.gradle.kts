@@ -11,8 +11,8 @@ android {
         applicationId = "com.dipsons.autopunch"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         // Where the API files live (the folder that holds autopunch_pair.php etc.). Must be https.
         buildConfigField("String", "API_BASE", "\"https://payroll.dipsons.com/api/\"")
     }

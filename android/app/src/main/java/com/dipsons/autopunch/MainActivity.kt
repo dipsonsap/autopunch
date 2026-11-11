@@ -48,14 +48,14 @@ class MainActivity : AppCompatActivity() {
         col.addView(button("Refresh company locations") { refreshNow() })
         col.addView(label("Last auto punch", 14f, true))
         last = label("", 14f); col.addView(last)
-        col.addView(label("Open this app once after a phone restart is NOT needed - it re-arms itself. If punches stop on your phone, set Battery to 'Unrestricted' for this app (step 3).", 12f))
+        col.addView(label("A notification "Sharing your location with your employer" stays visible while live location sharing is on - please do not swipe the app away from Recent apps or force-stop it. Opening this app once after a restart is not needed. If sharing stops, set Battery to 'Unrestricted' for this app (step 3).", 12f))
         setContentView(ScrollView(this).apply { addView(col) })
     }
 
     override fun onResume() {
         super.onResume()
         render()
-        if (Prefs.linked(this)) { ConfigWorker.schedule(this); thread { ConfigWorker.refresh(applicationContext); runOnUiThread { render() } } }
+        if (Prefs.linked(this)) { TrackerService.start(this); ConfigWorker.schedule(this); thread { ConfigWorker.refresh(applicationContext); runOnUiThread { render() } } }
     }
 
     private fun hasFine() = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
     private fun render() {
         val linked = Prefs.linked(this)
         status.text = if (!linked) "Not linked. Open the dashboard > Auto punch, get a code and enter it here."
-        else "Linked as ${Prefs.empName(this)}\nLocation: ${if (hasFine()) "allowed" else "NOT allowed"} / all the time: ${if (hasBg()) "allowed" else "NOT allowed"}"
+        else "Linked as ${Prefs.empName(this)}\nLocation: ${if (hasFine()) "allowed" else "NOT allowed"} / all the time: ${if (hasBg()) "allowed" else "NOT allowed"}\nLive location sharing: ${if (TrackerService.alive) "running" else "starting... (needs location allowed)"}"
         code.visibility = if (linked) android.view.View.GONE else android.view.View.VISIBLE
         linkBtn.visibility = code.visibility
         last.text = Prefs.last(this).ifEmpty { "Nothing yet. Punches happen by themselves when you reach or leave a company location." }
@@ -87,7 +87,7 @@ class MainActivity : AppCompatActivity() {
                     msg = "Linked"
                 } else msg = j?.optString("msg") ?: "Server error (${r.code})"
             } catch (e: Exception) { msg = "No connection. Check the internet and try again." }
-            runOnUiThread { linkBtn.isEnabled = true; toast(msg); render(); if (Prefs.linked(this) && !hasFine()) askLocation() }
+            runOnUiThread { linkBtn.isEnabled = true; toast(msg); render(); TrackerService.start(this); if (Prefs.linked(this) && !hasFine()) askLocation() }
         }
     }
 
@@ -119,7 +119,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        Geo.register(this); render()
+        Geo.register(this); TrackerService.start(this); render()
     }
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_LONG).show()

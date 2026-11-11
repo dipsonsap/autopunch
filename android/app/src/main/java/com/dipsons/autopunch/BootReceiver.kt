@@ -10,5 +10,6 @@ class BootReceiver : BroadcastReceiver() {
         if (!Prefs.linked(context)) return
         Geo.register(context)
         ConfigWorker.schedule(context)
+        TrackerService.start(context)   // live location + device status reporting
     }
 }
