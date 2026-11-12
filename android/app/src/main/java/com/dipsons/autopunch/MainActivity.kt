@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         col.addView(button("Refresh company locations") { refreshNow() })
         col.addView(label("Last auto punch", 14f, true))
         last = label("", 14f); col.addView(last)
-        col.addView(label("A notification "Sharing your location with your employer" stays visible while live location sharing is on - please do not swipe the app away from Recent apps or force-stop it. Opening this app once after a restart is not needed. If sharing stops, set Battery to 'Unrestricted' for this app (step 3).", 12f))
+        col.addView(label("A notification saying Sharing your location with your employer stays visible while live location sharing is on - please do not swipe the app away from Recent apps or force-stop it. Opening this app once after a restart is not needed. If sharing stops, set Battery to 'Unrestricted' for this app (step 3).", 12f))
         setContentView(ScrollView(this).apply { addView(col) })
     }
 
