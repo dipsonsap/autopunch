@@ -71,11 +71,11 @@ class TrackerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        if (!Prefs.linked(this)) { stopSelf(); return }
         try {
             val n = notification()
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION) else startForeground(NOTIF_ID, n)
         } catch (e: Exception) { stopSelf(); return }
+        if (!Prefs.linked(this)) { stopSelf(); return }
         alive = true; running = true
         exec = Executors.newSingleThreadScheduledExecutor()
         val f = IntentFilter().apply {
@@ -89,7 +89,7 @@ class TrackerService : Service() {
             cm.registerDefaultNetworkCallback(ncb); netCb = ncb
         } catch (e: Exception) { }
         requestUpdates()
-        try { exec.schedule({ beat() }, 2, TimeUnit.SECONDS) } catch (e: Exception) { }
+        try { exec.schedule(Runnable { beat() }, 2, TimeUnit.SECONDS) } catch (e: Exception) { }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -118,7 +118,7 @@ class TrackerService : Service() {
     private fun runNow() { if (!running) return; try { exec.execute { beat(false) } } catch (e: Exception) { } }
 
     private fun beat(reschedule: Boolean = true) {
-        try { doBeat() } catch (e: Exception) { } finally { if (reschedule && running) { try { exec.schedule({ beat() }, intervalS, TimeUnit.SECONDS) } catch (e: Exception) { } } }
+        try { doBeat() } catch (e: Exception) { } finally { if (reschedule && running) { try { exec.schedule(Runnable { beat() }, intervalS, TimeUnit.SECONDS) } catch (e: Exception) { } } }
     }
 
     private fun doBeat() {
